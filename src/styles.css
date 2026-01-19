@@ -143,7 +143,7 @@ code {
     monospace;
 }
 
-/* WebKit 滚动条样式（Chrome、Edge、Safari 等） */
+/* WebKit 滚动条样式 */
 .style__scoller {
   ::-webkit-scrollbar {
     width: 6px;
@@ -155,7 +155,7 @@ code {
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: var(--color-secondary); /* 黑色滑块 */
+    background-color: var(--color-secondary);
     border-radius: 9999px;
     background-clip: padding-box;
   }
@@ -169,4 +169,46 @@ code {
 
 .style__shallow-shadow {
   box-shadow: 3px 3px 12px 0px #e9f1fc;
+}
+
+/* 以下为 Demo 移植所需的自定义动画与工具类 
+  来自 deyu-demo 的视觉效果
+*/
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.3; }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 6s ease-in-out infinite;
+  animation-delay: 3s;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s ease-in-out infinite;
+}
+
+/* 隐藏滚动条但保留滚动功能 */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* 提示词列表的渐变遮罩 */
+.mask-image-fade {
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
 }

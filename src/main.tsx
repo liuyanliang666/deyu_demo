@@ -8,7 +8,6 @@ import "./styles.css";
 import reportWebVitals from "./reportWebVitals.ts";
 import { routeTree } from "./route.tsx";
 import { Toaster } from "./components/ui/sonner.tsx";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useIsMobile } from "./hooks/use-mobile.ts";
 
 scan({
@@ -51,7 +50,6 @@ if (rootElement && !rootElement.innerHTML) {
       <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
         <RouterProvider router={router} />
         <Toast />
-        <ReactQueryDevtools />
       </TanStackQueryProvider.Provider>
     </StrictMode>
   );

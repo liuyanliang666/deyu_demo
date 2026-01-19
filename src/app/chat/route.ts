@@ -21,6 +21,9 @@ const conversationRoute = createRoute({
   getParentRoute: () => chatRoute,
   path: "/$conversationId",
   component: lazyRouteComponent(() => import("./ConversationPage")),
+  validateSearch: (search: { agentId?: string }) => {
+    return search;
+  },
 });
 
 const chatRouteTree = chatRoute.addChildren([

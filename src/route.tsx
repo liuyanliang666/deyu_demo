@@ -3,7 +3,6 @@ import {
   Outlet,
   createRoute,
 } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import authRouteTree from "./app/auth/route";
 import chatRouteTree from "./app/chat/route";
 import authenticatedRoute from "./app/_authenticated/route";
@@ -24,7 +23,6 @@ export const rootRoute = createRootRouteWithContext<MyRouterContext>()({
   component: () => (
     <>
       <Outlet />
-      <TanStackRouterDevtools position="bottom-right" />
     </>
   ),
 });

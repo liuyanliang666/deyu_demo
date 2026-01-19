@@ -1,412 +1,344 @@
+//
 "use client";
-import UserPromptTextarea from "@/app/chat/components/UserPromptTextarea";
-import { Actions } from "@/components/ai-elements/actions";
-import { Action } from "@/components/ai-elements/actions";
-import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import { Message, MessageContent } from "@/components/ai-elements/message";
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
+
+import { createConversation } from "@/apis/requests/conversation/create";
+import { Actions, Action } from "@/components/ai-elements/actions";
 import { Response } from "@/components/ai-elements/response";
 import { useStreamCompletion } from "@/hooks/use-stream-completion";
-import { toast } from "sonner";
 import { useInitMessageStore } from "@/store/initMessage";
-import { useParams } from "@tanstack/react-router";
-import { Copy, LoaderCircle, ThumbsDownIcon, ThumbsUpIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import MessageEditor, {
-  type MessageEditorRef,
-} from "./components/MessageEditor";
-import { useDebounceEffect } from "ahooks";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import {
-  Branch,
-  BranchMessages,
-  BranchPrevious,
-  BranchPage,
-  BranchNext,
-  BranchSelector,
-} from "@/components/ai-elements/branch";
-import { useIsMobile } from "@/hooks/use-mobile";
+  ChevronLeft,
+  Copy,
+  LoaderCircle,
+  Mic,
+  MoreHorizontal,
+  Paperclip,
+  Send,
+  Smile,
+  Sparkles,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { AGENTS } from "./constants/agents";
 
-export default function ConversationPagePC() {
-  const isMobile = useIsMobile();
+export default function ConversationPage() {
+  const navigate = useNavigate();
   const { conversationId } = useParams({ strict: false });
-  const { initMessage, hasProcessed, markAsProcessed, clearInitMessage } =
-    useInitMessageStore();
-  const [hasInitMessageSubmitted, setHasInitMessageSubmitted] = useState(false);
-  const [isReplace, setIsReplace] = useState(false);
-  const inlinePromptTextareaRef = useRef<MessageEditorRef>(null);
-  const previousMessageIdRef = useRef<string | null>(null);
+  const { agentId: agentIdFromSearch } = useSearch({ strict: false }) as {
+    agentId?: string;
+  };
+
+  // 如果 URL 参数能命中 AGENTS，说明这是“选了智能体但还没创建会话”的占位页
+  const agentFromParam = useMemo(
+    () => AGENTS.find((a) => a.id === conversationId),
+    [conversationId],
+  );
+  const isAgentPlaceholder = !!agentFromParam;
+  const selectedAgentId = agentFromParam?.id ?? agentIdFromSearch;
+  const activeAgent = useMemo(
+    () => AGENTS.find((a) => a.id === selectedAgentId) ?? AGENTS[0],
+    [selectedAgentId],
+  );
+
+  // 占位页不传 conversationId 给 hook（否则会 404）
+  const hookConversationId = isAgentPlaceholder ? undefined : conversationId;
+
+  const { status, messages, sendMessage, handleFeedback } = useStreamCompletion(
+    hookConversationId as string,
+  );
 
   const {
-    status,
-    messages,
-    sendMessage,
-    lastAssistantMessageId,
-    lastUserMessageId,
-    abortRequest,
-    handleFeedback,
-    rollbackMessagesTo,
-    selectBranchIdRef,
-    fetchEarlier,
-    lastAssistantMessageBranch,
-    hasMoreEarlier,
-    isFetchingEarlier,
-  } = useStreamCompletion(conversationId as string);
+    initMessage,
+    hasProcessed,
+    markAsProcessed,
+    clearInitMessage,
+    setInitMessage,
+  } = useInitMessageStore();
+
+  const [input, setInput] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, status]);
+
+  // “创建会话后自动发送”的首条消息
+  useEffect(() => {
+    if (!hookConversationId) return;
     if (initMessage && !hasProcessed) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setHasInitMessageSubmitted(true);
       markAsProcessed();
       const message = initMessage;
       clearInitMessage();
-      sendMessage(message, void 0, () => {
-        setHasInitMessageSubmitted(false);
-      });
-      // 发送消息后清除初始消息
+      sendMessage(message);
     }
   }, [
+    hookConversationId,
     initMessage,
     hasProcessed,
     markAsProcessed,
     clearInitMessage,
     sendMessage,
   ]);
-  // const handleRegenerate = () => {
-  //   const lastUserMessage = messages.find(
-  //     (message) => message.id === lastUserMessageId.current,
-  //   );
-  //   if (!lastUserMessage) return;
-  //   const message = lastUserMessage.content;
-  //   if (message && status === "ready") {
-  //     rollbackMessagesTo(
-  //       lastUserMessage.id,
-  //       lastAssistantMessageBranch.length === 0,
-  //     );
-  //     setTimeout(() => {
-  //       sendMessage(message, {
-  //         completionsOption: { isRegen: true },
-  //         replyId: lastUserMessage.id,
-  //       });
-  //     }, 0);
-  //   }
-  // };
 
-  // const handleEditUserMessage = (message: string) => {
-  //   // 将消息绑定到输入框中
-  //   setIsReplace(true);
-  //   // 使用 setTimeout 确保组件已经渲染
-  //   setTimeout(() => {
-  //     inlinePromptTextareaRef.current?.setTextContent(message);
-  //     inlinePromptTextareaRef.current?.focus();
-  //   }, 0);
-  // };
-
-  const cancelEditUserMessage = () => {
-    inlinePromptTextareaRef.current?.blur();
-    setIsReplace(false);
-  };
-
-  const handleSubmit = (message: string, onSuccess?: () => void) => {
-    if (message.trim() && status === "ready") {
-      if (isReplace) {
-        inlinePromptTextareaRef.current?.blur();
-        if (lastUserMessageId.current) {
-          rollbackMessagesTo(lastUserMessageId.current);
-        }
-        setIsReplace(false);
-      }
-      setTimeout(() => {
-        sendMessage(
-          message,
-          {
-            completionsOption: {
-              isReplace,
-              selectedRegenId: lastAssistantMessageBranch.length
-                ? selectBranchIdRef.current ??
-                  lastAssistantMessageBranch[
-                    lastAssistantMessageBranch.length - 1
-                  ].id
-                : undefined,
-            },
-          },
-          onSuccess
-        );
-      }, 0);
-    }
-  };
-
-  const handleCopy = (message: string) => {
-    toast.success("复制成功");
-    navigator.clipboard.writeText(message);
-  };
-
-  // 顶部哨兵：当最上方消息触达到视图顶端时，加载更早消息
-  const topSentinelRef = useRef<HTMLDivElement | null>(null);
-  useDebounceEffect(
-    () => {
-      const el = topSentinelRef.current;
-      if (!el) return;
-      const observer = new IntersectionObserver(
-        (entries) => {
-          const first = entries[0];
-          if (first.isIntersecting && hasMoreEarlier && !isFetchingEarlier) {
-            document
-              .querySelector("#list-container")
-              ?.children[0]?.scrollTo(0, 32);
-            fetchEarlier();
-          }
-        },
-        { root: null, threshold: 0 }
-      );
-      observer.observe(el);
-      return () => observer.disconnect();
+  const createConversationAndRedirect = useCallback(
+    async (firstMessage: string) => {
+      const abort = new AbortController();
+      const conversation = await createConversation(abort);
+      setInitMessage(firstMessage);
+      await navigate({
+        to: "/chat/$conversationId",
+        params: { conversationId: conversation.conversationId },
+        search: selectedAgentId ? { agentId: selectedAgentId } : undefined,
+        replace: true,
+      });
     },
-    [fetchEarlier, hasMoreEarlier, isFetchingEarlier],
-    {
-      wait: 800,
-    }
+    [navigate, selectedAgentId, setInitMessage],
   );
-  useEffect(() => {
-    const el = topSentinelRef.current;
-    if (!el) return;
-    if (messages.length) {
-      const currentId = `mid-${messages[0].id}`;
-      if (!previousMessageIdRef.current) {
-        previousMessageIdRef.current = currentId;
-      }
-      const previousId = previousMessageIdRef.current;
-      if (previousId === currentId) {
-        return;
-      }
-      const previousNode = document.getElementById(previousId);
-      if (!previousNode) {
-        return;
-      }
-      const scrooler = document.querySelector("#list-container")?.children[0];
-      scrooler?.scrollTo(0, previousNode?.offsetTop);
-      previousMessageIdRef.current = currentId;
-    }
-  }, [messages]);
-  return (
-    <div className="max-w-[1000px] mx-auto p-6 py-0 relative size-full rounded-lg">
-      <div className="flex flex-col h-full">
-        <Conversation id="list-container" className="style__scoller-none">
-          <ConversationContent className="relative">
-            {!initMessage && !hasProcessed ? (
-              isFetchingEarlier ? (
-                <div className="absolute w-full justify-center flex py-4">
-                  <LoaderCircle className="animate-spin duration-500 stroke-primary" />
-                </div>
-              ) : (
-                <div ref={topSentinelRef} className="w-full p-1" />
-              )
-            ) : null}
-            {messages.map((message) => (
-              <Message
-                id={`mid-${message.id}`}
-                key={message.id}
-                from={message.role}
-              >
-                {message.role === "user" ? (
-                  message.id !== lastUserMessageId.current || !isReplace ? (
-                    <div className="flex flex-col items-end">
-                      <MessageContent>
-                        <p>{message.content}</p>
-                      </MessageContent>
-                      {status === "ready" &&
-                        lastUserMessageId.current === message.id && (
-                          <Actions className="mt-2">
-                            <Action
-                              label="Copy"
-                              onClick={() => handleCopy(message.content)}
-                            >
-                              <Copy className="size-4" />
-                            </Action>
-                            {/* <Action
-                              label="Regenerate"
-                              onClick={() =>
-                                handleEditUserMessage(message.content)
-                              }
-                            >
-                              <PencilLine className="size-4" />
-                            </Action> */}
-                          </Actions>
-                        )}
-                    </div>
-                  ) : (
-                    <MessageEditor
-                      ref={inlinePromptTextareaRef}
-                      onSubmit={handleSubmit}
-                      onExit={cancelEditUserMessage}
-                      disabled={status !== "ready"}
-                    />
-                  )
-                ) : (
-                  <div className="flex gap-3">
-                    {!isMobile && (
-                      <div>
-                        <div className="size-10 order-1 rounded-full overflow-hidden">
-                          <img src="/logo.jpg" alt="张江高科·高科芯" />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex flex-col bg-white style__shallow-shadow rounded-3xl">
-                      <MessageContent>
-                        <Branch
-                          onBranchChange={(index) => {
-                            selectBranchIdRef.current =
-                              lastAssistantMessageBranch[index].id;
-                          }}
-                        >
-                          <BranchMessages>
-                            {(message.id === lastAssistantMessageId.current
-                              ? lastAssistantMessageBranch.length
-                                ? message.isStreaming
-                                  ? [message]
-                                  : lastAssistantMessageBranch
-                                : [message]
-                              : [message]
-                            ).map((_message, _, messageArray) => {
-                              const forRegenList = messageArray.length > 1;
-                              // const regenerateable =
-                              //   _message.id ===
-                              //     lastAssistantMessageId.current ||
-                              //   messageArray.length > 1;
-                              return (
-                                <div key={_message.id}>
-                                  <div>
-                                    {_message.think && (
-                                      <Reasoning
-                                        defaultOpen={!_message.isCompleteThink}
-                                        className=""
-                                        isStreaming={status === "streaming"}
-                                      >
-                                        <ReasoningTrigger
-                                          isCompleted={_message.isCompleteThink}
-                                        />
-                                        <ReasoningContent className="text-[#80808f]">
-                                          {_message.think}
-                                        </ReasoningContent>
-                                      </Reasoning>
-                                    )}
-                                    {!!_message.content && (
-                                      <Response>{_message.content}</Response>
-                                    )}
-                                    {_message.isStreaming &&
-                                      !_message.think &&
-                                      !_message.content && (
-                                        <LoaderCircle className="size-4 animate-spin" />
-                                      )}
-                                  </div>
 
-                                  {!message.isStreaming && (
-                                    <Actions className="mt-2">
-                                      <Action
-                                        label="Copy"
-                                        onClick={() =>
-                                          handleCopy(_message.content)
-                                        }
-                                      >
-                                        <Copy className="size-4" />
-                                      </Action>
-                                      {/*                                       {regenerateable && (
-                                        <Action
-                                          label="Regenerate"
-                                          onClick={handleRegenerate}
-                                        >
-                                          <RefreshCcw className="size-4" />
-                                        </Action>
-                                      )} */}
-                                      {_message.feedback === 1 ? (
-                                        <Action
-                                          onClick={handleFeedback.bind(null, {
-                                            action: 0,
-                                            messageId: _message.id,
-                                            forRegenList,
-                                          })}
-                                          label="Like"
-                                        >
-                                          <ThumbsUpIcon className="size-4 fill-primary" />
-                                        </Action>
-                                      ) : _message.feedback === 2 ? (
-                                        <Action
-                                          onClick={handleFeedback.bind(null, {
-                                            action: 0,
-                                            messageId: _message.id,
-                                            forRegenList,
-                                          })}
-                                          label="DisLike"
-                                        >
-                                          <ThumbsDownIcon className="size-4 fill-primary" />
-                                        </Action>
-                                      ) : (
-                                        <>
-                                          <Action
-                                            onClick={handleFeedback.bind(null, {
-                                              action: 1,
-                                              messageId: _message.id,
-                                              forRegenList,
-                                            })}
-                                            label="Like"
-                                          >
-                                            <ThumbsUpIcon className="size-4" />
-                                          </Action>
-                                          <Action
-                                            onClick={handleFeedback.bind(null, {
-                                              action: 2,
-                                              messageId: _message.id,
-                                              forRegenList,
-                                            })}
-                                            label="Dislike"
-                                          >
-                                            <ThumbsDownIcon className="size-4" />
-                                          </Action>
-                                        </>
-                                      )}
-                                      {messageArray.length > 1 && (
-                                        <BranchSelector
-                                          from="assistant"
-                                          className="p-0 self-center"
-                                        >
-                                          <BranchPrevious />
-                                          <BranchPage />
-                                          <BranchNext />
-                                        </BranchSelector>
-                                      )}
-                                    </Actions>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </BranchMessages>
-                        </Branch>
-                      </MessageContent>
-                    </div>
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || status !== "ready") return;
+
+    const content = input;
+    setInput("");
+
+    // 占位页：先创建会话，再自动发送首条消息
+    if (isAgentPlaceholder) {
+      try {
+        await createConversationAndRedirect(content);
+      } catch (e) {
+        console.error("createConversation failed:", e);
+        toast.error("创建对话失败，请稍后重试");
+      }
+      return;
+    }
+
+    sendMessage(content);
+  }, [
+    createConversationAndRedirect,
+    input,
+    isAgentPlaceholder,
+    sendMessage,
+    status,
+  ]);
+
+  const renderHeader = () => {
+    const Icon = activeAgent.icon;
+
+    return (
+      <header className="bg-white/90 backdrop-blur border-b border-slate-100 px-4 lg:px-6 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate({ to: "/chat" })}
+            className="w-9 h-9 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-all border border-slate-200"
+          >
+            <ChevronLeft size={18} strokeWidth={2.5} />
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-10 h-10 rounded-xl bg-gradient-to-br ${activeAgent.gradient || "from-slate-400 to-slate-500"} flex items-center justify-center text-white shadow-md relative`}
+            >
+              <Icon size={20} strokeWidth={2} />
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+            </div>
+            <div>
+              <h1 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                {activeAgent.name || "智能助手"}
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded bg-${activeAgent.theme || "slate"}-50 text-${activeAgent.theme || "slate"}-600 font-semibold border border-${activeAgent.theme || "slate"}-100`}
+                >
+                  v2.0
+                </span>
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">
+                {activeAgent.type === "content"
+                  ? "Content Generator"
+                  : "Empathetic Chat"}{" "}
+                · 在线
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            className="p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-lg"
+            title="清空"
+          >
+            <Sparkles size={18} />
+          </button>
+          <div className="h-4 w-px bg-slate-200 mx-1"></div>
+          <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors hover:bg-slate-50 rounded-lg">
+            <MoreHorizontal size={18} />
+          </button>
+        </div>
+      </header>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-white font-sans relative">
+      {renderHeader()}
+
+      {/* 聊天区域 */}
+      <div className="flex-1 overflow-y-auto bg-slate-50/50 relative scroll-smooth p-4 lg:p-8 pb-32">
+        <div
+          className="absolute inset-0 pointer-events-none opacity-[0.02]"
+          style={{
+            backgroundImage: "radial-gradient(#475569 1px, transparent 1px)",
+            backgroundSize: "24px 24px",
+          }}
+        ></div>
+
+        <div className="max-w-3xl mx-auto space-y-8">
+          {/* 新开智能体占位页：欢迎语 */}
+          {isAgentPlaceholder && messages.length === 0 && (
+            <div className="flex justify-start">
+              <div className="flex flex-col gap-1 max-w-[80%]">
+                <span className="text-[10px] text-slate-400 font-medium pl-1">
+                  {activeAgent.name}
+                </span>
+                <div className="p-4 rounded-2xl shadow-sm text-[15px] leading-relaxed bg-white text-slate-700 border border-slate-100 rounded-tl-sm">
+                  你好！我是{activeAgent.name}。{activeAgent.desc}
+                  请告诉我你需要什么帮助？
+                  <div className="text-[10px] mt-2 opacity-50 flex items-center justify-end gap-1 text-slate-400">
+                    <Sparkles size={8} /> 刚刚
                   </div>
-                )}
-              </Message>
-            ))}
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
-        <UserPromptTextarea
-          className={
-            isMobile
-              ? "mx-auto sticky bottom-4 cursor-text aspect-auto max-h-42 min-h-24"
-              : "mx-auto sticky bottom-4"
-          }
-          onSubmit={handleSubmit}
-          onAbort={abortRequest}
-          status={hasInitMessageSubmitted ? "submitted" : status}
-        />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} group`}
+            >
+              <div
+                className={`flex max-w-[90%] sm:max-w-[80%] gap-3 ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+              >
+                <div className="flex flex-col gap-1 w-full">
+                  <div
+                    className={`p-4 rounded-2xl shadow-sm text-[15px] leading-relaxed relative ${
+                      message.role === "user"
+                        ? "bg-slate-900 text-white rounded-tr-sm shadow-slate-500/20"
+                        : "bg-white text-slate-700 border border-slate-100 rounded-tl-sm shadow-slate-200/50"
+                    }`}
+                  >
+                    <Response>{message.content}</Response>
+                    {message.isStreaming && (
+                      <LoaderCircle className="size-4 animate-spin mt-2" />
+                    )}
+                  </div>
+
+                  {!message.isStreaming && message.role === "assistant" && (
+                    <Actions className="pl-2">
+                      <Action
+                        onClick={() => {
+                          navigator.clipboard.writeText(message.content);
+                          toast.success("已复制");
+                        }}
+                        label="Copy"
+                      >
+                        <Copy className="size-3" />
+                      </Action>
+                      <Action
+                        onClick={() =>
+                          handleFeedback({ messageId: message.id, action: 1 })
+                        }
+                        label="Like"
+                      >
+                        <ThumbsUpIcon className="size-3" />
+                      </Action>
+                      <Action
+                        onClick={() =>
+                          handleFeedback({ messageId: message.id, action: 2 })
+                        }
+                        label="Dislike"
+                      >
+                        <ThumbsDownIcon className="size-3" />
+                      </Action>
+                    </Actions>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* 底部输入区 */}
+      <div className="bg-white/90 backdrop-blur-xl border-t border-slate-100 p-4 lg:p-6 absolute bottom-0 w-full z-30">
+        <div className="max-w-3xl mx-auto">
+          {/* 提示语（仅在占位页且无消息时显示） */}
+          {isAgentPlaceholder && messages.length === 0 && activeAgent.prompts && (
+            <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide mb-1 mask-image-fade">
+              {activeAgent.prompts.map((prompt, i) => (
+                <button
+                  key={i}
+                  onClick={() => setInput(prompt)}
+                  className={`whitespace-nowrap text-xs font-medium px-4 py-2 rounded-xl border transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 flex items-center gap-2 bg-white text-${activeAgent.theme}-600 border-${activeAgent.theme}-100 hover:bg-${activeAgent.theme}-50`}
+                >
+                  <Sparkles size={12} /> {prompt}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="relative shadow-2xl shadow-slate-200/50 rounded-3xl group bg-white border border-slate-200 focus-within:border-blue-400 transition-colors overflow-hidden">
+            <div className="absolute bottom-3 left-3 flex gap-1">
+              <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full">
+                <Paperclip size={18} />
+              </button>
+              <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full">
+                <Mic size={18} />
+              </button>
+              <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full hidden sm:block">
+                <Smile size={18} />
+              </button>
+            </div>
+
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder={
+                isAgentPlaceholder && activeAgent.id === "jieyoupu"
+                  ? "这里是安全的树洞..."
+                  : "请输入您的需求..."
+              }
+              className="w-full pl-4 pr-16 pb-14 pt-4 bg-transparent border-none focus:ring-0 outline-none resize-none max-h-32 min-h-[90px] text-slate-700 text-sm placeholder:text-slate-400"
+              rows={1}
+            />
+
+            <div className="absolute right-2 bottom-2">
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || status !== "ready"}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 font-medium text-sm ${
+                  !input.trim() || status !== "ready"
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : "bg-slate-900 text-white shadow-lg hover:scale-105 active:scale-95"
+                }`}
+              >
+                发送 <Send size={14} className={input.trim() ? "ml-0.5" : ""} />
+              </button>
+            </div>
+          </div>
+
+          <p className="text-center text-[10px] text-slate-400 mt-3 font-medium flex items-center justify-center gap-1">
+            内容由 InnoSpark AI 生成，已通过德育价值对齐检测
+          </p>
+        </div>
       </div>
     </div>
   );
