@@ -10,7 +10,6 @@ import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import {
   ChevronLeft,
   Copy,
-  LoaderCircle,
   Mic,
   MoreHorizontal,
   Paperclip,
@@ -61,8 +60,27 @@ export default function ConversationPage() {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const copyText = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("已复制");
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      textarea.style.top = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      toast.success("已复制");
+    }
+  }, []);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages, status]);
 
   // “创建会话后自动发送”的首条消息
@@ -184,7 +202,7 @@ export default function ConversationPage() {
       {renderHeader()}
 
       {/* 聊天区域 */}
-      <div className="flex-1 overflow-y-auto bg-slate-50/50 relative scroll-smooth p-4 lg:p-8 pb-32">
+      <div className="flex-1 overflow-y-auto bg-slate-50/50 relative scroll-smooth p-4 lg:p-8 pb-8">
         <div
           className="absolute inset-0 pointer-events-none opacity-[0.02]"
           style={{
@@ -229,38 +247,70 @@ export default function ConversationPage() {
                     }`}
                   >
                     <Response>{message.content}</Response>
-                    {message.isStreaming && (
-                      <LoaderCircle className="size-4 animate-spin mt-2" />
+                    {message.isStreaming && message.role === "assistant" && (
+                      <div className="mt-2 flex items-center gap-1 text-slate-400">
+                        <span className="sr-only">正在生成</span>
+                        <span
+                          className="h-1.5 w-1.5 rounded-full bg-current animate-bounce"
+                          style={{ animationDelay: "0ms" }}
+                        />
+                        <span
+                          className="h-1.5 w-1.5 rounded-full bg-current animate-bounce"
+                          style={{ animationDelay: "120ms" }}
+                        />
+                        <span
+                          className="h-1.5 w-1.5 rounded-full bg-current animate-bounce"
+                          style={{ animationDelay: "240ms" }}
+                        />
+                      </div>
                     )}
                   </div>
 
-                  {!message.isStreaming && message.role === "assistant" && (
-                    <Actions className="pl-2">
-                      <Action
-                        onClick={() => {
-                          navigator.clipboard.writeText(message.content);
-                          toast.success("已复制");
-                        }}
-                        label="Copy"
-                      >
+                  {!message.isStreaming && (
+                    <Actions className="pl-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Action onClick={() => copyText(message.content)} tooltip="复制">
                         <Copy className="size-3" />
                       </Action>
-                      <Action
-                        onClick={() =>
-                          handleFeedback({ messageId: message.id, action: 1 })
-                        }
-                        label="Like"
-                      >
-                        <ThumbsUpIcon className="size-3" />
-                      </Action>
-                      <Action
-                        onClick={() =>
-                          handleFeedback({ messageId: message.id, action: 2 })
-                        }
-                        label="Dislike"
-                      >
-                        <ThumbsDownIcon className="size-3" />
-                      </Action>
+                      {message.role === "assistant" && (
+                        <>
+                          <Action
+                            onClick={() =>
+                              handleFeedback({ messageId: message.id, action: 1 })
+                            }
+                            className={
+                              message.feedback === 1
+                                ? "text-slate-900 hover:text-slate-900"
+                                : undefined
+                            }
+                            tooltip="赞"
+                          >
+                            <ThumbsUpIcon
+                              className="size-3"
+                              fill={
+                                message.feedback === 1 ? "currentColor" : "none"
+                              }
+                            />
+                          </Action>
+                          <Action
+                            onClick={() =>
+                              handleFeedback({ messageId: message.id, action: 2 })
+                            }
+                            className={
+                              message.feedback === 2
+                                ? "text-slate-900 hover:text-slate-900"
+                                : undefined
+                            }
+                            tooltip="踩"
+                          >
+                            <ThumbsDownIcon
+                              className="size-3"
+                              fill={
+                                message.feedback === 2 ? "currentColor" : "none"
+                              }
+                            />
+                          </Action>
+                        </>
+                      )}
                     </Actions>
                   )}
                 </div>
@@ -272,7 +322,7 @@ export default function ConversationPage() {
       </div>
 
       {/* 底部输入区 */}
-      <div className="bg-white/90 backdrop-blur-xl border-t border-slate-100 p-4 lg:p-6 absolute bottom-0 w-full z-30">
+      <div className="bg-white/90 backdrop-blur-xl border-t border-slate-100 p-4 lg:p-6 w-full z-30 shrink-0">
         <div className="max-w-3xl mx-auto">
           {/* 提示语（仅在占位页且无消息时显示） */}
           {isAgentPlaceholder && messages.length === 0 && activeAgent.prompts && (

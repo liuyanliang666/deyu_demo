@@ -395,7 +395,11 @@ export function useStreamCompletion(conversationId: string) {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        let tempUserMessageId = addMessage({ content, role: "user" });
+        let tempUserMessageId = addMessage({
+          content,
+          role: "user",
+          isStreaming: false,
+        });
 
         if (!response.body) {
           throw new Error("Empty Body!");
@@ -437,17 +441,18 @@ export function useStreamCompletion(conversationId: string) {
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
 
-          for (const line of lines) {
+          for (const rawLine of lines) {
+            const line = rawLine.trimEnd();
             if (line.startsWith("id: ")) {
               // currentId = Number.parseInt(line.substring(4), 10);
               continue;
             }
             if (line.startsWith("event: ")) {
-              currentType = line.substring(7) as StreamChunk["event"];
+              currentType = line.substring(7).trim() as StreamChunk["event"];
               continue;
             }
             if (line.startsWith("data: ")) {
-              const dataStr = line.substring(6);
+              const dataStr = line.substring(6).trim();
               if (dataStr.trim() === "{}") continue;
 
               try {
