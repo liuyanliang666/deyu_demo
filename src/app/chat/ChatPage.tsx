@@ -1,8 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import {
   Sparkles,
-  Bell,
-  Search,
   MessageCircle,
   BookOpen,
   Users,
@@ -127,52 +125,6 @@ export default function ChatPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans">
-      {/* 顶部导航栏 */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/60 sticky top-0 z-30 px-4 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-1.5 rounded-lg shadow-md">
-            <Sparkles className="text-white w-4 h-4" />
-          </div>
-          <span className="font-bold text-lg text-slate-800 tracking-tight hidden sm:block">
-            高科芯·德育
-          </span>
-        </div>
-
-        {/* 搜索框 (仅做 UI 展示) */}
-        <div className="hidden md:flex relative max-w-md w-full mx-8">
-          <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
-          <input
-            type="text"
-            placeholder="搜索智能体或历史对话记录..."
-            className="w-full bg-slate-100 border-none rounded-full py-2 pl-10 pr-4 text-sm text-slate-600 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-          />
-        </div>
-
-        {/* 右侧用户区 */}
-        <div className="flex items-center gap-4">
-          <button className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-full hover:bg-slate-100">
-            <Bell size={20} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-          </button>
-          <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
-          <div className="flex items-center gap-3 cursor-pointer group">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">
-                张老师
-              </p>
-              <p className="text-[10px] text-slate-400">七年级(2)班班主任</p>
-            </div>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
-              <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
-                alt="User"
-                className="w-full h-full"
-              />
-            </div>
-          </div>
-        </div>
-      </header>
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 第一行：统计数据 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

@@ -23,8 +23,7 @@ export default function ChatLayout() {
   }
   return (
     <div
-      style={{ backgroundImage: "url(/chats/bg.png)" }}
-      className="w-full h-full bg-cover bg-center bg-no-repeat"
+      className="w-full h-full bg-white"
     >
       <SidebarProvider
         style={

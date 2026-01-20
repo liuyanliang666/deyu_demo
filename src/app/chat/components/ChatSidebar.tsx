@@ -3,8 +3,8 @@ import {
   Edit,
   LoaderCircle,
   LogOut,
-  MessageCircleMoreIcon,
   MoreHorizontal,
+  Search,
   Trash2,
 } from "lucide-react";
 
@@ -47,7 +47,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ClientQueryKeys from "@/apis/queryKeys";
 import { queryHistory } from "@/apis/requests/conversation/query";
 import { deleteConversation } from "@/apis/requests/conversation/delete";
-import { cn } from "@/lib/utils";
 import { useInitMessageStore } from "@/store/initMessage";
 import { userInfoStore } from "@/store/user";
 import { TOKEN_KEY } from "@/lib/request";
@@ -296,26 +295,13 @@ export default function ChatSidebar() {
         )}
         <div className="flex items-center justify-around px-2 gap-2 pt-10">
           <div className="flex items-center gap-2">
-            <h2 className="text-primary font-semibold text-2xl">
-            高科芯 <strong>·</strong> 德育大模型
+            <h2 className="text-primary font-semibold text-xl">
+            彗育领航 <strong>·</strong> 德育大模型
             </h2>
           </div>
           {state === "expanded" && (
             <SidebarTrigger className="self-end" icon={<Collapse />} />
           )}
-        </div>
-        <div className="px-3 space-y-4 flex flex-col my-6">
-          <Button
-            className={cn(["rounded-full text-lg"])}
-            size={"lg"}
-            variant={"default"}
-            onClick={() => {
-              navigate({ to: "/chat" });
-            }}
-          >
-            <MessageCircleMoreIcon className="stroke-2 size-6" />
-            开始对话
-          </Button>
         </div>
       </SidebarHeader>
       <SidebarContent className="px-3" ref={scrollContainerRef}>
@@ -360,7 +346,7 @@ export default function ChatSidebar() {
                               to={`/chat/$conversationId`}
                               params={{ conversationId: item.conversationId }}
                             >
-                              <span>{item.brief}</span>
+                              <span className="font-medium">{item.brief}</span>
                             </Link>
                           </SidebarMenuButton>
                         )}
@@ -428,13 +414,9 @@ export default function ChatSidebar() {
           value={seacherQueryKey}
           onChange={handleChangeSearchKey}
           placeholder="搜索..."
-          className="p-5 pr-14 rounded-full border-2 border-primary"
+          className="p-5 pr-12 rounded-full border-2 border-primary"
         />
-        <img
-          className="size-13 absolute right-0 top-1/2 translate-x-1 -translate-y-1/2"
-          src="/chats/search.png"
-          alt="搜索"
-        />
+        <Search className="absolute right-5 top-1/2 -translate-y-1/2 size-5 text-primary/70 pointer-events-none" />
       </div>
       <Separator />
       <SidebarFooter className="flex flex-row justify-between items-center p-6">
