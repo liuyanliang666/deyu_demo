@@ -1,6 +1,7 @@
 import { createRoute, lazyRouteComponent, Outlet } from "@tanstack/react-router";
 import { rootRoute } from "@/route";
 import SetNewUserPasswordPage from "./SetNewUserPasswordPage";
+import LoginPage from "./LoginPage";
 // Auth routes
 const authRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -20,7 +21,7 @@ const loginRoute = createRoute({
 const verificationLoginRoute = createRoute({
   getParentRoute: ()=>loginRoute,
   path: '/',
-  component: lazyRouteComponent(() => import("./LoginPage")),
+  component: LoginPage,
 })
 
 const phonePasswordLoginRoute = createRoute({
