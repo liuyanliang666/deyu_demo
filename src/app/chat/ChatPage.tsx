@@ -187,20 +187,6 @@ export default function ChatPage() {
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               智能体矩阵
             </h3>
-            <div className="hidden sm:flex gap-1 p-1 bg-slate-100 rounded-lg">
-              {["全部", "内容生成", "多轮对话"].map((f, i) => (
-                <button
-                  key={f}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                    i === 0
-                      ? "bg-white text-slate-800 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
           </div>
           <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">
             共 {AGENTS.length} 个助手可用

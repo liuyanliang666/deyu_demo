@@ -304,6 +304,15 @@ export default function ChatSidebar() {
           )}
         </div>
       </SidebarHeader>
+      <div className="relative mx-3 my-6">
+        <Input
+          value={seacherQueryKey}
+          onChange={handleChangeSearchKey}
+          placeholder="搜索..."
+          className="p-5 pr-12 rounded-full border-2 border-primary"
+        />
+        <Search className="absolute right-5 top-1/2 -translate-y-1/2 size-5 text-primary/70 pointer-events-none" />
+      </div>
       <SidebarContent className="px-3" ref={scrollContainerRef}>
         {isLoading ? (
           <div className="w-full justify-center flex">
@@ -346,7 +355,7 @@ export default function ChatSidebar() {
                               to={`/chat/$conversationId`}
                               params={{ conversationId: item.conversationId }}
                             >
-                              <span className="font-medium">{item.brief}</span>
+                              <span className="font-normal">{item.brief}</span>
                             </Link>
                           </SidebarMenuButton>
                         )}
@@ -409,15 +418,6 @@ export default function ChatSidebar() {
           </>
         )}
       </SidebarContent>
-      <div className="relative mx-3 my-6">
-        <Input
-          value={seacherQueryKey}
-          onChange={handleChangeSearchKey}
-          placeholder="搜索..."
-          className="p-5 pr-12 rounded-full border-2 border-primary"
-        />
-        <Search className="absolute right-5 top-1/2 -translate-y-1/2 size-5 text-primary/70 pointer-events-none" />
-      </div>
       <Separator />
       <SidebarFooter className="flex flex-row justify-between items-center p-6">
         <DropdownMenu>
