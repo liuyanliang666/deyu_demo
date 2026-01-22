@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGSAP } from "@gsap/react";
-import { Outlet } from "@tanstack/react-router";
+import { Outlet, useLocation } from "@tanstack/react-router";
 import gsap from "gsap";
 import { useRef } from "react";
 import Collapse from "../components/collapse";
@@ -49,6 +49,9 @@ export default function ChatLayout() {
 function SidebarExpandTrigger() {
   const { state } = useSidebar();
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const shouldOffsetForHeader =
+    location.pathname.startsWith("/chat/") && location.pathname !== "/chat";
   const ref = useRef<HTMLButtonElement>(null);
   useGSAP(() => {
     if (!ref.current) return;
@@ -70,7 +73,7 @@ function SidebarExpandTrigger() {
       <SidebarTrigger
         variant={"outline"}
         icon={<Collapse />}
-        className="transition-none opacity-0 absolute z-50 size-10 left-4 top-4 rounded-full bg-white border-2"
+        className={`transition-none opacity-0 absolute z-50 size-10 left-4 ${shouldOffsetForHeader ? "top-20" : "top-4"} rounded-full bg-white border-2`}
         ref={ref}
         iconClassName="size-6"
       />

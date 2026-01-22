@@ -6,6 +6,7 @@ import {
 import authRouteTree from "./app/auth/route";
 import chatRouteTree from "./app/chat/route";
 import authenticatedRoute from "./app/_authenticated/route";
+import { adminRouteTree } from "./app/admin/route";
 import type { UserCredentials } from "./apis/requests/user/schema";
 
 // 定义认证状态接口
@@ -36,10 +37,14 @@ const indexRoute = createRoute({
     return null;
   },
 });
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   authRouteTree,
+  // 原有的聊天应用路由
   authenticatedRoute.addChildren([
     chatRouteTree,
   ]),
+  // 新增的管理后台路由
+  adminRouteTree, // <--- 注册在这里
 ]);
