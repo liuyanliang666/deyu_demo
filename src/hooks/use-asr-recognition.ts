@@ -11,6 +11,27 @@ interface UseAsrRecognitionReturn {
   stopRecognition: () => void;
   error: string | null;
 }
+
+type RecognitionMode = "ws" | "speech" | null;
+
+type SpeechRecognitionCtor = new () => {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: unknown) => void) | null;
+  onerror: ((event: unknown) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
 export function useAsrRecognition({
   onMessage,
 }: {
@@ -24,8 +45,9 @@ export function useAsrRecognition({
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const recorderRef = useRef<ReturnType<typeof Recorder> | null>(null); // Recorder实例
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout>(null);
+  const speechRef = useRef<InstanceType<SpeechRecognitionCtor> | null>(null);
+  const modeRef = useRef<RecognitionMode>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sampleBufRef = useRef<Int16Array>(new Int16Array());
   const clearText = () => {
     onlineTextRef.current = "";
@@ -33,6 +55,11 @@ export function useAsrRecognition({
   };
   // 清理资源
   const cleanup = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
@@ -43,13 +70,18 @@ export function useAsrRecognition({
       recorderRef.current = null;
     }
 
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      mediaStreamRef.current = null;
+    if (speechRef.current) {
+      try {
+        speechRef.current.stop();
+      } catch {
+        // ignore
+      }
+      speechRef.current = null;
     }
 
     // 清空采样缓冲区
     sampleBufRef.current = new Int16Array();
+    modeRef.current = null;
     clearText();
     setStatus("idle");
   }, []);
@@ -116,7 +148,15 @@ export function useAsrRecognition({
 
   // 停止语音识别
   const stopRecognition = useCallback(() => {
+    if (status === "idle") return;
     try {
+      if (modeRef.current === "speech") {
+        speechRef.current?.stop();
+        toast.info("正在停止语音输入...");
+        cleanup();
+        return;
+      }
+
       sendLastPacket();
 
       // 停止Recorder录音
@@ -137,32 +177,88 @@ export function useAsrRecognition({
       console.error("停止语音识别失败:", err);
       setError("停止语音识别失败");
     } finally {
-      timeoutRef.current = setTimeout(() => {
-        cleanup();
-        timeoutRef.current = null;
-      }, 3000);
+      timeoutRef.current = setTimeout(() => cleanup(), 3000);
     }
-  }, [sendLastPacket, cleanup]);
+  }, [cleanup, sendLastPacket, status]);
+
+  const startSpeechRecognition = useCallback(() => {
+    const Ctor = getSpeechRecognitionCtor();
+    if (!Ctor) {
+      setError("当前浏览器不支持语音识别");
+      toast.error("当前浏览器不支持语音识别");
+      cleanup();
+      return;
+    }
+
+    const recognition = new Ctor();
+    speechRef.current = recognition;
+    modeRef.current = "speech";
+
+    setStatus("recognizing");
+    setError(null);
+    clearText();
+
+    let finalText = "";
+    recognition.lang = "zh-CN";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event: unknown) => {
+      try {
+        // Web Speech API 类型在 TS 里不稳定，这里做最小化解析
+        const e = event as {
+          resultIndex: number;
+          results: ArrayLike<{
+            isFinal: boolean;
+            0: { transcript: string };
+          }>;
+        };
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i];
+          const transcript = res[0]?.transcript ?? "";
+          if (res.isFinal) {
+            finalText += transcript;
+          } else {
+            interim += transcript;
+          }
+        }
+        onMessage(`${finalText}${interim}`.trim());
+      } catch (err) {
+        console.error("解析 SpeechRecognition 结果失败:", err);
+      }
+    };
+
+    recognition.onerror = (event: unknown) => {
+      console.error("SpeechRecognition 错误:", event);
+      setError("语音识别失败");
+      toast.error("语音识别失败");
+      cleanup();
+    };
+
+    recognition.onend = () => {
+      cleanup();
+    };
+
+    try {
+      recognition.start();
+      toast.success("开始语音输入");
+    } catch (err) {
+      console.error("启动 SpeechRecognition 失败:", err);
+      setError("启动语音识别失败");
+      toast.error("启动语音识别失败");
+      cleanup();
+    }
+  }, [cleanup, onMessage]);
 
   // 开始语音识别
   const startRecognition = useCallback(async () => {
     if (timeoutRef.current) return;
+    if (status !== "idle") return;
     setStatus("pending");
     try {
       setError(null);
       clearText();
-
-      // 获取麦克风权限 (48kHz采样率，单声道，600ms包长度)
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 48000, // 48kHz采样率
-          channelCount: 1, // 单声道
-          echoCancellation: true,
-          noiseSuppression: true,
-        },
-      });
-
-      mediaStreamRef.current = stream;
 
       // 创建Recorder录音机（类似CLI的配置）
       const recorder = Recorder({
@@ -172,6 +268,7 @@ export function useAsrRecognition({
         onProcess: processAudioData, // 使用新的PCM处理函数
       });
       recorderRef.current = recorder;
+      modeRef.current = "ws";
 
       // 建立 WebSocket 连接
       const ws = new WebSocket(env.VITE_ASR_WS_URL);
@@ -226,13 +323,18 @@ export function useAsrRecognition({
       ws.onerror = (err) => {
         console.error("WebSocket 错误:", err);
         setError("语音识别连接失败");
-        toast.error("语音识别连接失败");
+        toast.error("语音识别连接失败，尝试使用浏览器语音识别...");
+        ws.onerror = null;
+        ws.onclose = null;
         cleanup();
+        startSpeechRecognition();
       };
 
       ws.onclose = (event) => {
         console.log("WebSocket 连接关闭", event);
-        cleanup();
+        if (modeRef.current === "ws") {
+          cleanup();
+        }
       };
     } catch (err) {
       console.error("启动语音识别失败:", err);
@@ -252,8 +354,9 @@ export function useAsrRecognition({
         toast.error("启动语音识别失败");
       }
       cleanup();
+      startSpeechRecognition();
     }
-  }, [cleanup, onMessage, processAudioData]);
+  }, [cleanup, processAudioData, startSpeechRecognition, status]);
 
   // 组件卸载时清理资源
   useEffect(() => cleanup, [cleanup]);

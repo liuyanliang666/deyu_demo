@@ -4,6 +4,7 @@
 import { createConversation } from "@/apis/requests/conversation/create";
 import { Actions, Action } from "@/components/ai-elements/actions";
 import { Response } from "@/components/ai-elements/response";
+import { useAsrRecognition } from "@/hooks/use-asr-recognition";
 import { useStreamCompletion } from "@/hooks/use-stream-completion";
 import { useInitMessageStore } from "@/store/initMessage";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
@@ -59,6 +60,26 @@ export default function ConversationPage() {
 
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const asrBaseTextRef = useRef("");
+
+  const { status: asrStatus, startRecognition, stopRecognition } =
+    useAsrRecognition({
+      onMessage: (recognizedText) => {
+        setInput(`${asrBaseTextRef.current}${recognizedText}`);
+      },
+    });
+
+  const handleMicClick = useCallback(() => {
+    if (status !== "ready") return;
+    if (asrStatus === "recognizing") {
+      stopRecognition();
+      return;
+    }
+    if (asrStatus === "idle") {
+      asrBaseTextRef.current = input ? `${input}\n` : "";
+      startRecognition();
+    }
+  }, [asrStatus, input, startRecognition, status, stopRecognition]);
 
   const copyText = useCallback(async (text: string) => {
     try {
@@ -118,6 +139,10 @@ export default function ConversationPage() {
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || status !== "ready") return;
+    if (asrStatus === "recognizing" || asrStatus === "pending") {
+      stopRecognition();
+      return;
+    }
 
     const content = input;
     setInput("");
@@ -135,11 +160,13 @@ export default function ConversationPage() {
 
     sendMessage(content);
   }, [
+    asrStatus,
     createConversationAndRedirect,
     input,
     isAgentPlaceholder,
     sendMessage,
     status,
+    stopRecognition,
   ]);
 
   const renderHeader = () => {
@@ -344,7 +371,18 @@ export default function ConversationPage() {
               <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full">
                 <Paperclip size={18} />
               </button>
-              <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full">
+              <button
+                onClick={handleMicClick}
+                disabled={status !== "ready" || asrStatus === "pending"}
+                className={`p-2 rounded-full transition-colors ${
+                  status !== "ready" || asrStatus === "pending"
+                    ? "text-slate-300 cursor-not-allowed"
+                    : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                } ${asrStatus === "recognizing" ? "animate-pulse" : ""}`}
+                title={
+                  asrStatus === "recognizing" ? "点击停止录音" : "点击开始语音输入"
+                }
+              >
                 <Mic size={18} />
               </button>
               <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full hidden sm:block">
