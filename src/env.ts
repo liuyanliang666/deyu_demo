@@ -13,6 +13,8 @@ export const env = createEnv({
     VITE_BACKEND_ENV_HEAD: z.string(),
     VITE_BACKEND_ENV_VALUE: z.string().optional(),
     VITE_ASR_WS_URL: z.string().url(),
+    VITE_VERIFY_CODE_APP_NAME: z.string().optional(),
+    VITE_VERIFY_CODE_BASE_URL: z.string().url().optional(),
   },
 
   /**

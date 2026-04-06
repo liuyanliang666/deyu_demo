@@ -98,6 +98,15 @@ export default defineConfig({
     tailwindcss(),
     removeConsole()
   ],
+  server: {
+    proxy: {
+      "/verify-api": {
+        target: "https://synapse.aiecnu.net",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/verify-api/, ""),
+      },
+    },
+  },
   // test: {
   //   globals: true,
   //   environment: 'jsdom',
